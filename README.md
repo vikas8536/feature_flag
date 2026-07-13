@@ -73,8 +73,9 @@ mvn verify -Pslt      # unit tests + service-level (SLT) performance tests
   Fine at human write rates; switch to nested/persistent maps if writes get hot.
 - **SHA-256 over murmur3** — chosen correctness-first for well-distributed
   buckets; swap for a faster non-crypto hash if profiling shows it matters.
-- **No delete API** — out of scope. Add `delete(scopeKey)` on `ConfigStore`
-  when a flag needs to be retired.
+- **Delete API** — `ConfigSource.delete(flag, env, tenant)` removes a scoped
+  config at runtime (no-op if absent). A deleted flag evaluates to the caller's
+  default with a `NOT_FOUND` log, same as a never-configured one.
 
 ## Measured performance (SLT)
 
