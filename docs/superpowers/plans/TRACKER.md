@@ -15,8 +15,8 @@ Subagent model: **opus**. Waves run as parallel subagents.
 | 3. DottedPathResolver | 2 | 1 | done | 417c25d | |
 | 4. Bucketer | 2 | 1 | done | e42a575 | |
 | 5. ErrorSink + rate-limited stderr | 2 | 1 | done | b6e68b2+66d41b9 | race fix after review |
-| 6. RuleMatcher | 3 | 2, 3 | pending | | |
-| 7. ConfigStore + Snapshot | 3 | 2 | pending | | |
+| 6. RuleMatcher | 3 | 2, 3 | done | 98d4e54 | |
+| 7. ConfigStore + Snapshot | 3 | 2 | done | e11288e | |
 | 8. Evaluator | 4 | 4, 5, 6, 7 | pending | | |
 | 9. FeatureFlagClient | 5 | 8 | pending | | |
 | 10. Concurrency stress | 6 | 9 | pending | | |
