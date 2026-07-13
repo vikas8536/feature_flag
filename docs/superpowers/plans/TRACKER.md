@@ -18,7 +18,7 @@ Subagent model: **opus**. Waves run as parallel subagents.
 | 6. RuleMatcher | 3 | 2, 3 | done | 98d4e54 | |
 | 7. ConfigStore + Snapshot | 3 | 2 | done | e11288e | |
 | 8. Evaluator | 4 | 4, 5, 6, 7 | done | 61057c4 | |
-| 9. FeatureFlagClient | 5 | 8 | pending | | |
+| 9. FeatureFlagClient | 5 | 8 | done | 8d36315 | |
 | 10. Concurrency stress | 6 | 9 | pending | | |
 | 11. SLT suite | 6 | 9 | pending | | |
 | 12. README + final verify | 7 | 10, 11 | pending | | |
