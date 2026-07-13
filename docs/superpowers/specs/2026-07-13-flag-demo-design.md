@@ -26,7 +26,8 @@ New package `com.example.flags.demo` in `src/main`:
 | File | Responsibility |
 | --- | --- |
 | `FlagDemo.java` | Phase script, invariant checks, timeline output. `run()` returns `List<String>` of violations; `main()` prints and exits `1` if non-empty. |
-| `ReaderFleet.java` | 8 reader threads. Each records its last-observed value, an escaped-`Throwable` count (must remain 0), and an illegal-value count. |
+| `ReaderFleet.java` | 8 reader threads. Each records its last-observed value, the set of all values it ever observed, and an escaped-`Throwable` count (must remain 0). |
+| `CountingSink.java` | `ErrorSink` that counts per `ErrorKind` and keeps the first detail seen for each. |
 
 Run:
 
@@ -37,9 +38,16 @@ mvn -q compile && java -cp target/classes com.example.flags.demo.FlagDemo
 No `exec-maven-plugin`. Adding a build plugin to save one line of typing is not
 a trade worth making.
 
-The demo reuses `ConfigStore` and the existing `com.example.flags.log.RecordingSink`
-(already in `src/main`, so no test-scope juggling) to assert the logging half of
-the error contract.
+The demo reuses `ConfigStore` and supplies its own `CountingSink` to assert the
+logging half of the error contract.
+
+**Why not the existing `RecordingSink`:** it stores entries in a
+`CopyOnWriteArrayList`, so every `add` copies the entire backing array. In P3,
+eight reader threads spin through a `NOT_FOUND` window generating a log per read
+— that is quadratic and would dominate the demo's runtime or exhaust the heap.
+`RecordingSink` is sized for tests that produce a handful of entries, not for a
+load loop. `CountingSink` is O(1) per log and counting is all the assertions
+need.
 
 ## Phases
 
@@ -95,9 +103,12 @@ While readers continue calling `stringValue("greeting", …)`, the writer:
 Assertions:
 
 - Zero `Throwable`s escape into any reader.
-- Readers serve the **caller's** default throughout both mutations.
-- `RecordingSink` records `NOT_FOUND` (after the delete) and then
-  `TYPE_MISMATCH` (after the type swap).
+- Readers serve the **caller's** default throughout both mutations — and the only
+  values they observe during this phase are the last published generation or that
+  caller default.
+- `CountingSink` records `NOT_FOUND` (after the delete) and then `TYPE_MISMATCH`
+  (after the type swap). Both are awaited with the same spin-and-timeout
+  discipline as propagation; a timeout is a violation.
 
 ## Propagation timing
 
