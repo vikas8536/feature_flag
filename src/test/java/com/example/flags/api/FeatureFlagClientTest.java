@@ -65,6 +65,21 @@ class FeatureFlagClientTest {
         assertTrue(client.boolValue("f", ctx(), false));
     }
 
+    @Test void rolloutCanStopAndResumeAtRetainedPercentage() {
+        var rollout = new Rule(List.of(), null,
+                new Rollout("user.id", null, 100, FlagValue.of(true)));
+        var active = new FlagConfig("f", "prod", "acme", FlagType.BOOLEAN,
+                FlagValue.of(false), true, FlagValue.of(true), List.of(rollout));
+        store.set(active);
+        assertTrue(client.boolValue("f", ctx(), false));
+
+        store.stopRollout("f", "prod", "acme");
+        assertFalse(client.boolValue("f", ctx(), true));
+
+        store.resumeRollout("f", "prod", "acme");
+        assertTrue(client.boolValue("f", ctx(), false));
+    }
+
     @Test void neverThrowsEvenOnNulls() {
         assertDoesNotThrow(() -> client.boolValue(null, null, true));
         assertTrue(client.boolValue(null, null, true));

@@ -4,6 +4,7 @@ import com.example.flags.api.EvaluationContext;
 import com.example.flags.api.FlagValue;
 import com.example.flags.config.FlagConfig;
 import com.example.flags.config.Rollout;
+import com.example.flags.config.RolloutState;
 import com.example.flags.config.Rule;
 import com.example.flags.log.ErrorKind;
 import com.example.flags.log.ErrorSink;
@@ -35,6 +36,8 @@ public final class Evaluator {
     private FlagValue doEvaluate(FlagConfig config, EvaluationContext ctx) {
         if (!config.enabled())
             return config.offValue() != null ? config.offValue() : config.defaultValue();
+        if (config.rolloutState() == RolloutState.STOPPED)
+            return config.defaultValue();
 
         Map<String, Object> attrs = ctx == null ? Map.of() : ctx.attributes();
         for (Rule rule : config.rules()) {

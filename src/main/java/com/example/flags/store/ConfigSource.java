@@ -14,8 +14,18 @@ import java.util.Optional;
  * zero-latency propagation). A remote-backed source is a drop-in swap.
  */
 public interface ConfigSource {
-    /** Validates and publishes a flag configuration; visible to readers immediately. */
+    /**
+     * Validates and publishes a flag configuration; visible to readers immediately.
+     * Implementations must reject decreases to an existing rollout percentage. Rollout state
+     * changes are only valid through {@link #stopRollout} and {@link #resumeRollout}.
+     */
     void set(FlagConfig config);
+
+    /** Atomically stops the scoped rollout while retaining its current configuration and percentage. */
+    void stopRollout(String flagName, String environment, String tenant);
+
+    /** Atomically resumes a stopped scoped rollout at its retained percentage. */
+    void resumeRollout(String flagName, String environment, String tenant);
 
     /** Current configuration for the scoped flag, or empty if not configured. */
     Optional<FlagConfig> get(String flagName, String environment, String tenant);

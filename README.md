@@ -62,6 +62,15 @@ mvn verify -Pslt      # unit tests + service-level (SLT) performance tests
 - **Rule match is terminal** — the first matching rule decides. If the user
   falls out of that rule's rollout bucket, the flag's default is served (no
   fall-through to later rules).
+- **Explicit rollout stop** — publishing a config with
+  `rolloutState = STOPPED` immediately serves the flag's `defaultValue` without
+  matching rules or bucketing. The retained percentage can later resume at the
+  same or a higher value. This is distinct from `enabled = false`, which keeps
+  serving `offValue ?: defaultValue`.
+- **Non-decreasing rollout updates** — `ConfigStore` atomically rejects a lower
+  percentage, rollout removal/replacement, or changed bucketing inputs for an
+  existing rollout. The transition is checked against the winning snapshot, so
+  stale concurrent writers cannot publish a lower percentage.
 - **Two-layer error contract** — the evaluator serves the flag's default on any
   internal error; the client boundary serves the *caller's* default when the
   config is unknowable (missing flag, type mismatch). All errors emit a
@@ -75,7 +84,28 @@ mvn verify -Pslt      # unit tests + service-level (SLT) performance tests
   buckets; swap for a faster non-crypto hash if profiling shows it matters.
 - **Delete API** — `ConfigSource.delete(flag, env, tenant)` removes a scoped
   config at runtime (no-op if absent). A deleted flag evaluates to the caller's
-  default with a `NOT_FOUND` log, same as a never-configured one.
+  default with a `NOT_FOUND` log, same as a never-configured one. Delete also
+  resets that flag's in-memory rollout history, so recreating it may start at a
+  lower percentage. Process restart has the same effect; durable control planes
+  must persist and enforce their own high-water marks.
+
+## Stopping and resuming a rollout
+
+```java
+// Emergency fallback: all users receive defaultValue; current percentage is retained.
+store.stopRollout("checkout-v2", "prod", "acme");
+
+// Resume the same sticky cohort after the feature is fixed.
+store.resumeRollout("checkout-v2", "prod", "acme");
+```
+
+Stopping is flag-wide: fixed-value rules and percentage rollout rules are all
+bypassed. To ramp further after resuming, publish the same rollout topology and
+bucketing inputs with a higher percentage. Ordinary `set` calls cannot change
+rollout state, preventing stale writers from stopping or resuming it
+accidentally. The invariant applies to rollout percentage and
+bucketing inputs; changing targeting clauses or earlier rules can still change
+which users reach that rollout.
 
 ## Measured performance (SLT)
 
