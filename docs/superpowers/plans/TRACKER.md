@@ -19,8 +19,8 @@ Subagent model: **opus**. Waves run as parallel subagents.
 | 7. ConfigStore + Snapshot | 3 | 2 | done | e11288e | |
 | 8. Evaluator | 4 | 4, 5, 6, 7 | done | 61057c4 | |
 | 9. FeatureFlagClient | 5 | 8 | done | 8d36315 | |
-| 10. Concurrency stress | 6 | 9 | pending | | |
-| 11. SLT suite | 6 | 9 | pending | | |
+| 10. Concurrency stress | 6 | 9 | done | 9c1f27a | |
+| 11. SLT suite | 6 | 9 | done | bd7d9f6 | p99=935ns, 4.9M/s 8-thread |
 | 12. README + final verify | 7 | 10, 11 | pending | | |
 
 Status values: `pending` → `in_progress` → `done` (or `blocked: <reason>`).
