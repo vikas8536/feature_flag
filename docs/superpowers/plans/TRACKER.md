@@ -1,0 +1,26 @@
+# Feature Flag Service — Execution Tracker
+
+Cross-session source of truth. Each task's final step updates its row and
+commits it. A fresh session: read this file, dispatch the next wave whose
+dependencies are all `done`.
+
+Plan: `docs/superpowers/plans/2026-07-13-feature-flag-service.md`
+Spec: `docs/superpowers/specs/2026-07-13-feature-flag-service-design.md`
+Subagent model: **opus**. Waves run as parallel subagents.
+
+| Task | Wave | Depends on | Status | Commit | Notes |
+|---|---|---|---|---|---|
+| 1. Maven skeleton + smoke test | 1 | — | pending | | |
+| 2. API types + config model + validator | 2 | 1 | pending | | |
+| 3. DottedPathResolver | 2 | 1 | pending | | |
+| 4. Bucketer | 2 | 1 | pending | | |
+| 5. ErrorSink + rate-limited stderr | 2 | 1 | pending | | |
+| 6. RuleMatcher | 3 | 2, 3 | pending | | |
+| 7. ConfigStore + Snapshot | 3 | 2 | pending | | |
+| 8. Evaluator | 4 | 4, 5, 6, 7 | pending | | |
+| 9. FeatureFlagClient | 5 | 8 | pending | | |
+| 10. Concurrency stress | 6 | 9 | pending | | |
+| 11. SLT suite | 6 | 9 | pending | | |
+| 12. README + final verify | 7 | 10, 11 | pending | | |
+
+Status values: `pending` → `in_progress` → `done` (or `blocked: <reason>`).
