@@ -41,6 +41,29 @@ mvn test              # unit tests
 mvn verify -Pslt      # unit tests + service-level (SLT) performance tests
 ```
 
+## Demo
+
+A multi-threaded sample app that exercises the client against a live-mutating store:
+
+```bash
+mvn -q compile && java -cp target/classes com.example.flags.demo.FlagDemo
+```
+
+Eight reader threads hammer the client while the main thread rewrites the config
+underneath them. Each phase asserts one guarantee and prints what it observed:
+
+- **P1** cycles a flag's value under load — readers converge on each new value
+  (propagation latency printed per step) and never observe a value that was never
+  published.
+- **P2** ramps a rollout `0 → 25 → 50 → 100` across 10,000 users — the enabled
+  cohort only ever grows, so bucketing is sticky.
+- **P3** deletes the flag and then changes its type mid-flight — readers keep
+  serving the caller's default, no exception escapes, and `NOT_FOUND` /
+  `TYPE_MISMATCH` are logged.
+
+Exits 0 on `PASS`, 1 on `FAIL`. `FlagDemoTest` runs the same script under
+`mvn test`, so the guarantees are checked in CI too.
+
 ## Design decisions
 
 - **SDK consumes the store through the given interface** — the client
