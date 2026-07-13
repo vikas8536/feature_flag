@@ -3,6 +3,7 @@ package com.example.flags.config;
 import com.example.flags.api.FlagType;
 import com.example.flags.api.FlagValue;
 import org.junit.jupiter.api.Test;
+import java.util.ArrayList;
 import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -79,6 +80,19 @@ class ConfigValidatorTest {
         var r = new Rule(List.of(), null, new Rollout(null, null, 10, FlagValue.of(true)));
         FlagConfig out = ConfigValidator.validate(boolFlag(List.of(r)));
         assertEquals("user.id", out.rules().get(0).rollout().bucketingKey());
+    }
+
+    @Test void validatedConfigImmuneToCallerListMutation() {
+        var values = new ArrayList<Object>(List.of("x"));
+        var clauses = new ArrayList<Clause>(List.of(new Clause("a", Operator.IN, values)));
+        var r = new Rule(clauses, FlagValue.of(true), null);
+        FlagConfig out = ConfigValidator.validate(boolFlag(List.of(r)));
+
+        values.add("y");
+        clauses.add(new Clause("b", Operator.EXISTS, List.of()));
+
+        assertEquals(1, out.rules().get(0).clauses().size());
+        assertEquals(1, out.rules().get(0).clauses().get(0).values().size());
     }
 
     @Test void rejectsBlankIdentifiers() {

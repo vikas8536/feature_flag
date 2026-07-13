@@ -29,7 +29,11 @@ public final class ConfigValidator {
             if (r.clauses().isEmpty() && i != rules.size() - 1)
                 throw new ConfigValidationException(c.flagName() + ": rule " + i + " matches all; later rules dead");
             for (Clause cl : r.clauses()) validateClause(c.flagName(), cl);
-            normalized.add(r.rollout() == null ? r : new Rule(r.clauses(), null, normalizeRollout(c, r.rollout())));
+            List<Clause> clauses = new ArrayList<>(r.clauses().size());
+            for (Clause cl : r.clauses())
+                clauses.add(new Clause(cl.path(), cl.op(), cl.values() == null ? List.of() : List.copyOf(cl.values())));
+            normalized.add(new Rule(List.copyOf(clauses),
+                    r.value(), r.rollout() == null ? null : normalizeRollout(c, r.rollout())));
         }
         return new FlagConfig(c.flagName(), c.environment(), c.tenant(), c.type(),
                 c.defaultValue(), c.enabled(), c.offValue(), List.copyOf(normalized));
