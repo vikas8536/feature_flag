@@ -19,9 +19,12 @@ public final class RateLimitedStderrSink implements ErrorSink {
     boolean shouldLog(ErrorKind kind, String flag) {
         String key = kind + ":" + flag;
         long now = clock.getAsLong();
-        Long prev = lastLogged.get(key);
-        if (prev != null && now - prev < windowMillis) return false;
-        return lastLogged.compute(key, (k, v) -> (v != null && now - v < windowMillis) ? v : now) == now;
+        boolean[] won = new boolean[1];
+        lastLogged.compute(key, (k, v) -> {
+            if (v != null && now - v < windowMillis) { won[0] = false; return v; }
+            won[0] = true; return now;
+        });
+        return won[0];
     }
 
     @Override
