@@ -10,7 +10,7 @@ Subagent model: **opus**. Waves run as parallel subagents.
 
 | Task | Wave | Depends on | Status | Commit | Notes |
 |---|---|---|---|---|---|
-| 1. Maven skeleton + smoke test | 1 | — | pending | | |
+| 1. Maven skeleton + smoke test | 1 | — | done | 1f8b8f7 | |
 | 2. API types + config model + validator | 2 | 1 | pending | | |
 | 3. DottedPathResolver | 2 | 1 | pending | | |
 | 4. Bucketer | 2 | 1 | pending | | |
