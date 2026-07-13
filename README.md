@@ -139,3 +139,6 @@ which users reach that rollout.
 - Evaluation latency: **p99 ~935 ns**
 - Throughput: **~4.9M evals/s** across 8 threads
 - Config propagation: **~0 ms** (snapshot swap)
+- `stopRollout` / `resumeRollout` latency: **p99 ~1.6–2.0 µs**, **p999 ~10–17 µs**
+- `stopRollout` / `resumeRollout` cycle throughput: **~2.5M cycles/s** (single thread)
+- Stop / resume propagation: **~0 ms** (same atomic-snapshot mechanism)
