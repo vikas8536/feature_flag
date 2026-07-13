@@ -17,8 +17,9 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * A multi-threaded sample application that proves three SDK guarantees: live propagation with no
- * torn reads, sticky bucketing under a rollout ramp, and the never-throws error contract.
+ * A multi-threaded sample application that proves four SDK guarantees: live propagation with no
+ * torn reads, sticky bucketing under a rollout ramp, the never-throws error contract, and safe
+ * rollout stop/resume that preserves the cohort.
  *
  * <p>Run it with:
  * <pre>{@code mvn -q compile && java -cp target/classes com.example.flags.demo.FlagDemo}</pre>
@@ -64,6 +65,7 @@ public final class FlagDemo {
             phase1Propagation(fleet);
             phase2StickyRamp();
             phase3NeverThrows(fleet);
+            phase4StopResume();
         }
         return List.copyOf(violations);
     }
@@ -168,6 +170,57 @@ public final class FlagDemo {
         else
             System.out.println("    " + (fleet.reads() - readsBefore)
                     + " reads across both mutations, 0 exceptions escaped");
+    }
+
+    /**
+     * P4 — stop a rollout in flight, verify every user gets the flag's defaultValue, then resume
+     * and confirm the original cohort is intact. Finally, ramp the resumed rollout higher and
+     * confirm the cohort only grows.
+     */
+    private void phase4StopResume() {
+        System.out.println("P4  stop/resume: stopping " + CHECKOUT + " mid-flight, then resuming");
+
+        // P2 left checkout-v2 at 100% ACTIVE; reset the in-memory high-water mark so we can
+        // start this phase at 50%.
+        store.delete(CHECKOUT, ENV, TENANT);
+        store.set(rolloutFlag(CHECKOUT, 50));
+        Set<String> enabledAt50 = enabledUsers();
+        System.out.printf("    50%% active   -> %6.2f%% enabled (%d/%d users)%n",
+                100.0 * enabledAt50.size() / USERS, enabledAt50.size(), USERS);
+
+        store.stopRollout(CHECKOUT, ENV, TENANT);
+        Set<String> enabledWhileStopped = enabledUsers();
+        if (!enabledWhileStopped.isEmpty()) {
+            violations.add("P4: stopped rollout still served the rollout's value to "
+                    + enabledWhileStopped.size() + " user(s) — first example: "
+                    + enabledWhileStopped.iterator().next());
+        }
+        System.out.printf("    STOPPED      -> %6.2f%% enabled (%d/%d users) — every user gets defaultValue%n",
+                100.0 * enabledWhileStopped.size() / USERS, enabledWhileStopped.size(), USERS);
+
+        store.resumeRollout(CHECKOUT, ENV, TENANT);
+        Set<String> enabledAfterResume = enabledUsers();
+        Set<String> droppedOnResume = new HashSet<>(enabledAt50);
+        droppedOnResume.removeAll(enabledAfterResume);
+        if (!droppedOnResume.isEmpty()) {
+            violations.add("P4: resuming the rollout dropped " + droppedOnResume.size()
+                    + " user(s) from the original 50% cohort — bucketing is not sticky across stop");
+        }
+        System.out.printf("    ACTIVE       -> %6.2f%% enabled (%d/%d users) — original cohort intact%n",
+                100.0 * enabledAfterResume.size() / USERS, enabledAfterResume.size(), USERS);
+
+        // Resume must be at the retained or a higher percentage; 75% passes the validator and
+        // the new cohort should still contain the original 50%.
+        store.set(rolloutFlag(CHECKOUT, 75));
+        Set<String> enabledAt75 = enabledUsers();
+        Set<String> droppedOnRamp = new HashSet<>(enabledAt50);
+        droppedOnRamp.removeAll(enabledAt75);
+        if (!droppedOnRamp.isEmpty()) {
+            violations.add("P4: post-resume ramp 50% -> 75% dropped " + droppedOnRamp.size()
+                    + " user(s) from the original cohort");
+        }
+        System.out.printf("    75%% active   -> %6.2f%% enabled (%d/%d users) — original cohort intact%n",
+                100.0 * enabledAt75.size() / USERS, enabledAt75.size(), USERS);
     }
 
     /** Spins until the sink has recorded this kind at least once. Same timeout discipline as propagation. */

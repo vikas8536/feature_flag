@@ -60,6 +60,10 @@ underneath them. Each phase asserts one guarantee and prints what it observed:
 - **P3** deletes the flag and then changes its type mid-flight — readers keep
   serving the caller's default, no exception escapes, and `NOT_FOUND` /
   `TYPE_MISMATCH` are logged.
+- **P4** calls `ConfigSource.stopRollout` mid-flight, verifies that every user
+  receives the flag's `defaultValue` while stopped, then `resumeRollout`s and
+  confirms the original cohort is intact and a subsequent ramp to 75% only
+  grows the cohort (no flip-flopping out).
 
 Exits 0 on `PASS`, 1 on `FAIL`. `FlagDemoTest` runs the same script under
 `mvn test`, so the guarantees are checked in CI too.

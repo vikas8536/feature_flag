@@ -7,7 +7,7 @@ Status: Approved
 
 A runnable, multi-threaded sample application that exercises `FeatureFlagClient`
 against a live-mutating `ConfigSource`. It exists to demonstrate — and prove —
-three SDK guarantees that a unit test states but a demo can *show*:
+four SDK guarantees that a unit test states but a demo can *show*:
 
 1. **Live propagation with no torn reads.** Reader threads never observe a value
    that was never published, and they converge on a new config with no restart.
@@ -15,9 +15,13 @@ three SDK guarantees that a unit test states but a demo can *show*:
    enabled cohort only grows — no user ever flip-flops out.
 3. **Never-throws error contract.** Deleting a flag or swapping its type
    mid-flight surfaces caller defaults and structured logs, never an exception.
+4. **Safe rollout stop/resume.** Calling `ConfigSource.stopRollout` immediately
+   serves the flag's `defaultValue` to every caller, regardless of bucketing;
+   `resumeRollout` returns the same sticky cohort that was enabled at the time
+   of the stop.
 
 Throughput and latency numbers are explicitly **out of scope** — `SltTest`
-already owns them, and mixing them in would dilute the three invariants above.
+already owns them, and mixing them in would dilute the four invariants above.
 
 ## Placement and execution
 
@@ -110,6 +114,34 @@ Assertions:
   (after the type swap). Both are awaited with the same spin-and-timeout
   discipline as propagation; a timeout is a violation.
 
+### P4 — Safe rollout stop/resume
+
+The writer resets `checkout-v2` (delete + `set` at 50% ACTIVE) and sweeps
+10,000 users to record the enabled cohort at 50%. It then calls
+`ConfigSource.stopRollout("checkout-v2", "prod", "acme")` and sweeps again
+without any other flag mutation. Next, `resumeRollout` is called and the
+cohort is swept a third time. Finally, the writer publishes a higher
+percentage (75% ACTIVE) and sweeps once more.
+
+This is a sweep phase — no fleet — because the property to prove is the
+*set-level* behavior of stop/resume, not the per-read propagation. Propagation
+of `stopRollout`/`resumeRollout` is instant by the same atomic-snapshot
+mechanism that P1 demonstrates for `set`; re-proving it here would be noise.
+
+Assertions:
+
+- After `stopRollout`: **zero users enabled** — no user gets the rollout's
+  `value`; every user gets the flag's `defaultValue` (false). Bucketing is
+  bypassed entirely.
+- After `resumeRollout`: the original 50% cohort is a **subset** of the
+  resumed cohort (stickiness survives stop). The cohort is the exact same set
+  of users in practice (deterministic hash).
+- After ramping to 75% post-resume: the original 50% cohort is a **subset** of
+  the 75% cohort (nested cohorts after resume; the high-water mark from the
+  pre-stop 50% is retained, so 75% > 50% is accepted and the cohort only grows).
+
+Output: target state and percentage vs. observed enabled count per step.
+
 ## Propagation timing
 
 No `Thread.sleep`. After each write the writer spins (`Thread.onSpinWait`) until
@@ -137,4 +169,5 @@ CI-verifiable with no new tag, profile, or plugin — it runs inside the default
 - Throughput / p99 latency reporting (owned by `SltTest`).
 - Interactive stdin control (REPL-style `set` / `delete` / `ramp` commands).
 - Any change to SDK production code. The demo consumes the existing
-  `ConfigSource` surface exactly as an external caller would.
+  `ConfigSource` surface (including `stopRollout` / `resumeRollout`) exactly as
+  an external caller would.
