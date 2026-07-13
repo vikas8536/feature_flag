@@ -183,6 +183,7 @@ log/     ErrorSink
 | Isolation | same flag differs per env and per tenant; same user id across tenants → independent buckets; no cross-scope fallback |
 | Default-on-error | missing flag / wrong type → caller default + NOT_FOUND/TYPE_MISMATCH log; throwing resolver / absent bucketing key / null context → **flag default** + EVAL_ERROR log; sink rate-limiting verified |
 | Concurrency | N reader threads × M writer threads stress; every observed value legal under some published snapshot; run under `-race`-equivalent (JUnit repeated stress) |
+| SLT (service-level) | evaluation latency: p99 < 50µs, p999 < 1ms over 1M warmed evaluations (rules + rollout path), single thread and 8 threads; zero allocations target on the happy path (assert via measured throughput, not an allocation profiler); update propagation: `set()` observed by a concurrent reader in < 5s (measured, expected ~0); throughput floor: > 1M evals/sec/thread on dev hardware. Thresholds are generous CI-safe bounds — regression tripwires, not benchmarks. JUnit-tagged `slt`, excluded from default `mvn test`, run via `mvn verify -Pslt` and in milestone 6 |
 
 ## 7. Milestones
 
@@ -191,6 +192,6 @@ log/     ErrorSink
 3. Rollouts + stickiness + bucket-sharing semantics
 4. Tenancy + environment isolation
 5. Error-path hardening (default-on-error matrix)
-6. Concurrency stress + README
+6. Concurrency stress + SLT suite (latency/propagation/throughput tripwires) + README
 
 Commit after each green milestone (conventional messages).
