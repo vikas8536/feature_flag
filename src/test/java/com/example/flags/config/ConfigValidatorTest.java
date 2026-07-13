@@ -9,6 +9,12 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class ConfigValidatorTest {
 
+    @Test void nullRolloutStateRejected() {
+        var c = new FlagConfig("f", "prod", "acme", FlagType.BOOLEAN,
+                FlagValue.of(false), true, null, List.of(), null);
+        assertThrows(ConfigValidationException.class, () -> ConfigValidator.validate(c));
+    }
+
     private static FlagConfig boolFlag(List<Rule> rules) {
         return new FlagConfig("f", "prod", "acme", FlagType.BOOLEAN,
                 FlagValue.of(false), true, null, rules);

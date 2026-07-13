@@ -165,6 +165,11 @@ log/     ErrorSink
 
 - Value types match flag `type` (default, offValue, rule values, rollout values).
 - `percentage ∈ [0,100]`; rule has exactly one of value/rollout; regexes compile.
+- Existing rollout percentages may stay equal or increase, never decrease.
+  Existing rollout-bearing rule positions and bucketing inputs are retained;
+  `STOPPED` bypasses evaluation to the flag default without resetting history.
+  Stop/resume are atomic store operations, and ordinary `set()` cannot change
+  rollout state. This does not freeze targeting clauses or preceding rules.
 - Empty-clause rule must be last (later rules are dead — reject).
 - `GT/GTE/LT/LTE` clauses have exactly one numeric value; `EXISTS/NOT_EXISTS`
   have empty `values`.
@@ -178,6 +183,7 @@ log/     ErrorSink
 | Flag types | bool/string/int served; type mismatch → caller default + logged |
 | Targeting | table-driven per operator; nested paths; missing node → absent; array any-of; empty clauses match all; rule order (first wins) |
 | Stickiness | same user → same answer ×1000; ramp-up evicts nobody; distribution ≈ N% over 100k subjects (±1.5%) |
+| Rollout stop | STOPPED → flag default without bucketing; resume at retained/higher percentage; lower update rejected atomically |
 | Bucket sharing | same group → same bucket; different percentages in group → nested subset; no group → overlap ≈ p² |
 | Rule terminality | matched rule, out-of-bucket → flag default, later rules not tried |
 | Numerics | `Integer 20` vs `Long 20` vs `20.0` equality; GT with string value → false |

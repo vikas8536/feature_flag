@@ -40,6 +40,23 @@ class EvaluatorTest {
                 ev.evaluate(flag(false, null, List.of()), ctx("u", "IN")));
     }
 
+    @Test void stoppedRolloutServesDefaultWithoutBucketing() {
+        var rollout = new Rule(List.of(), null,
+                new Rollout("user.missing", null, 100, FlagValue.of(true)));
+        var stopped = flag(true, FlagValue.of(true), List.of(rollout))
+                .withRolloutState(RolloutState.STOPPED);
+
+        assertEquals(FlagValue.of(false), ev.evaluate(stopped, null));
+        assertEquals(0, sink.count(ErrorKind.EVAL_ERROR));
+    }
+
+    @Test void disabledTakesPrecedenceOverStopped() {
+        var stopped = flag(false, FlagValue.of(true), List.of())
+                .withRolloutState(RolloutState.STOPPED);
+
+        assertEquals(FlagValue.of(true), ev.evaluate(stopped, null));
+    }
+
     @Test void firstMatchingRuleWins() {
         var r1 = new Rule(List.of(new Clause("user.address.country", Operator.EQUALS, List.of("IN"))),
                 FlagValue.of(true), null);

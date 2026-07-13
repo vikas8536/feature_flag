@@ -3,6 +3,7 @@ package com.example.flags.config;
 import com.example.flags.api.FlagValue;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
@@ -17,6 +18,8 @@ public final class ConfigValidator {
             throw new ConfigValidationException(c.flagName() + ": defaultValue type mismatch");
         if (c.offValue() != null && c.offValue().type() != c.type())
             throw new ConfigValidationException(c.flagName() + ": offValue type mismatch");
+        if (c.rolloutState() == null)
+            throw new ConfigValidationException(c.flagName() + ": rolloutState is null");
 
         List<Rule> rules = c.rules() == null ? List.of() : c.rules();
         List<Rule> normalized = new ArrayList<>(rules.size());
@@ -36,7 +39,26 @@ public final class ConfigValidator {
                     r.value(), r.rollout() == null ? null : normalizeRollout(c, r.rollout())));
         }
         return new FlagConfig(c.flagName(), c.environment(), c.tenant(), c.type(),
-                c.defaultValue(), c.enabled(), c.offValue(), List.copyOf(normalized));
+                c.defaultValue(), c.enabled(), c.offValue(), List.copyOf(normalized), c.rolloutState());
+    }
+
+    public static void validateTransition(FlagConfig previous, FlagConfig next) {
+        if (previous.rolloutState() != next.rolloutState())
+            throw new ConfigValidationException(next.flagName() + ": rollout state must be changed explicitly");
+        for (int i = 0; i < previous.rules().size(); i++) {
+            Rollout oldRollout = previous.rules().get(i).rollout();
+            if (oldRollout == null) continue;
+            if (i >= next.rules().size() || next.rules().get(i).rollout() == null)
+                throw transitionError(next, i, "existing rollout cannot be removed or replaced");
+
+            Rollout newRollout = next.rules().get(i).rollout();
+            if (!Objects.equals(oldRollout.bucketingKey(), newRollout.bucketingKey())
+                    || !Objects.equals(oldRollout.bucketingGroup(), newRollout.bucketingGroup()))
+                throw transitionError(next, i, "bucketing inputs cannot change");
+            if (newRollout.percentage() < oldRollout.percentage())
+                throw transitionError(next, i, "percentage cannot decrease from "
+                        + oldRollout.percentage() + " to " + newRollout.percentage());
+        }
     }
 
     private static Rollout normalizeRollout(FlagConfig c, Rollout ro) {
@@ -75,5 +97,9 @@ public final class ConfigValidator {
 
     private static void requireNonBlank(String s, String what) {
         if (s == null || s.isBlank()) throw new ConfigValidationException(what + " is blank");
+    }
+
+    private static ConfigValidationException transitionError(FlagConfig c, int rule, String detail) {
+        return new ConfigValidationException(c.flagName() + ": rule " + rule + " " + detail);
     }
 }
