@@ -6,11 +6,11 @@ import com.example.flags.eval.Evaluator;
 import com.example.flags.log.ErrorKind;
 import com.example.flags.log.ErrorSink;
 import com.example.flags.log.RateLimitedStderrSink;
-import com.example.flags.store.ConfigStore;
+import com.example.flags.store.ConfigSource;
 import java.util.Optional;
 
 public final class FeatureFlagClient {
-    private final ConfigStore store;
+    private final ConfigSource store;
     private final String environment;
     private final String tenant;
     private final ErrorSink sink;
@@ -42,7 +42,7 @@ public final class FeatureFlagClient {
     /** Never throws. Returns null when the caller's default must be served. */
     private FlagValue value(String flag, EvaluationContext ctx, FlagType requested) {
         try {
-            Optional<FlagConfig> cfg = store.current().get(flag, environment, tenant);
+            Optional<FlagConfig> cfg = store.get(flag, environment, tenant);
             if (cfg.isEmpty()) {
                 sink.log(ErrorKind.NOT_FOUND, String.valueOf(flag), environment, tenant, "no config for scope");
                 return null;
@@ -63,12 +63,12 @@ public final class FeatureFlagClient {
     public static Builder builder() { return new Builder(); }
 
     public static final class Builder {
-        private ConfigStore store;
+        private ConfigSource store;
         private String environment;
         private String tenant;
         private ErrorSink sink = new RateLimitedStderrSink();
 
-        public Builder store(ConfigStore store) { this.store = store; return this; }
+        public Builder store(ConfigSource store) { this.store = store; return this; }
         public Builder environment(String environment) { this.environment = environment; return this; }
         public Builder tenant(String tenant) { this.tenant = tenant; return this; }
         public Builder errorSink(ErrorSink sink) { this.sink = sink; return this; }

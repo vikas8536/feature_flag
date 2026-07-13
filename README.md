@@ -43,9 +43,14 @@ mvn verify -Pslt      # unit tests + service-level (SLT) performance tests
 
 ## Design decisions
 
-- **Immutable snapshot in an `AtomicReference`** — writes swap a fresh snapshot
-  in; reads dereference and traverse it. Propagation is instant (0s) and reads
-  are fully lock-free.
+- **SDK consumes the store through the given interface** — the client
+  read-throughs `ConfigSource.get(flag, env, tenant)` on every evaluation (the
+  requirement's `set`/`get` surface, extended with the tenant dimension). No
+  private snapshot API leaks into the consumption path, so a remote-backed
+  `ConfigSource` is a drop-in swap.
+- **Immutable snapshot in an `AtomicReference`** — inside `ConfigStore`, writes
+  swap a fresh snapshot in; `get` dereferences it (one volatile read).
+  Propagation is instant (0s) and reads are fully lock-free.
 - **Pure-hash sticky bucketing (SHA-256)** — a user's bucket is a deterministic
   function of the hash input, so stickiness holds with zero per-user state at
   any user count.

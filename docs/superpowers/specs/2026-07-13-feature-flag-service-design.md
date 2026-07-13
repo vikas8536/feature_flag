@@ -31,6 +31,7 @@ hash, no assignment state is ever stored.
 | Numeric semantics | Before comparison, integral `Number`s (`Byte/Short/Integer/Long`) canonicalize to `long`, others to `double`; integral-vs-integral compares as long, any-double as double (`1 == 1.0` → true). INTEGER flag type is Java `long` internally. |
 | Stickiness persistence | None. Pure function of (salt, tenant, subject). Stable across calls, restarts, and SDK instances by construction. |
 | Config propagation | Immutable `ConfigSnapshot` in an `AtomicReference`. `set()` validates, copy-on-writes, publishes. Evaluator reads one volatile ref per eval — lock-free, 0s propagation (< 5s budget by construction). |
+| SDK consumption of store | Client read-throughs the requirement-given surface only: `ConfigSource.get(flag, env, tenant)` per evaluation (interface: `set`, `get`). Snapshot machinery is a `ConfigStore` implementation detail; per-eval stability comes from `FlagConfig` immutability. Remote-backed source = new `ConfigSource` impl, client unchanged. |
 
 ## 3. Config model
 
