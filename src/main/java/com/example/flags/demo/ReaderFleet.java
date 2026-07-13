@@ -9,11 +9,19 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReferenceArray;
 
 /**
- * A fleet of daemon threads calling {@code stringValue} on one flag in a tight loop, recording
- * what they observe so the main thread can assert on it.
+ * A fleet of daemon threads polling a single flag in a tight loop and recording what they
+ * observe. Used by the demo to assert that concurrent readers converge on each published
+ * config without ever seeing a stale or torn value.
  *
- * <p>Readers pass {@link #CALLER_DEFAULT} as their caller default, so observing that sentinel
- * means the SDK could not serve a config (the flag is missing, or its type does not match).
+ * <p>Two modes:
+ * <ul>
+ *   <li><b>String mode (default)</b> — readers call {@code client.stringValue(flag, ctx, CALLER_DEFAULT)}.
+ *       Observing {@link #CALLER_DEFAULT} means the SDK could not serve a config
+ *       (flag missing or type mismatch).</li>
+ *   <li><b>Bool mode</b> — readers call {@code client.boolValue(flag, ctx, false)} and the
+ *       observed value is {@code "true"} or {@code "false"}. Used by the demo for the
+ *       boolean {@code checkout-v2} flag in P2 and P4.</li>
+ * </ul>
  */
 public final class ReaderFleet implements AutoCloseable {
 
@@ -22,6 +30,7 @@ public final class ReaderFleet implements AutoCloseable {
     private final FeatureFlagClient client;
     private final String flag;
     private final EvaluationContext ctx;
+    private final boolean boolMode;
     private final Thread[] threads;
     private final AtomicReferenceArray<String> lastObserved;
     private final Set<String> observed = ConcurrentHashMap.newKeySet();
@@ -30,9 +39,14 @@ public final class ReaderFleet implements AutoCloseable {
     private volatile boolean running = true;
 
     public ReaderFleet(FeatureFlagClient client, String flag, EvaluationContext ctx, int threadCount) {
+        this(client, flag, ctx, threadCount, false);
+    }
+
+    public ReaderFleet(FeatureFlagClient client, String flag, EvaluationContext ctx, int threadCount, boolean boolMode) {
         this.client = client;
         this.flag = flag;
         this.ctx = ctx;
+        this.boolMode = boolMode;
         this.threads = new Thread[threadCount];
         this.lastObserved = new AtomicReferenceArray<>(threadCount);
     }
@@ -49,7 +63,9 @@ public final class ReaderFleet implements AutoCloseable {
     private void loop(int idx) {
         while (running) {
             try {
-                String value = client.stringValue(flag, ctx, CALLER_DEFAULT);
+                String value = boolMode
+                        ? Boolean.toString(client.boolValue(flag, ctx, false))
+                        : client.stringValue(flag, ctx, CALLER_DEFAULT);
                 lastObserved.set(idx, value);
                 observed.add(value);
                 reads.incrementAndGet();

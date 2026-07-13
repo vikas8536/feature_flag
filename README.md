@@ -55,15 +55,18 @@ underneath them. Each phase asserts one guarantee and prints what it observed:
 - **P1** cycles a flag's value under load — readers converge on each new value
   (propagation latency printed per step) and never observe a value that was never
   published.
-- **P2** ramps a rollout `0 → 25 → 50 → 100` across 10,000 users — the enabled
-  cohort only ever grows, so bucketing is sticky.
+- **P2** ramps a rollout `0 → 25 → 50 → 100` across 10,000 users while 8 reader
+  threads spin on the same flag — the enabled cohort only ever grows
+  (sticky bucketing), and the readers visibly converge on each ramp step
+  within microseconds.
 - **P3** deletes the flag and then changes its type mid-flight — readers keep
   serving the caller's default, no exception escapes, and `NOT_FOUND` /
   `TYPE_MISMATCH` are logged.
-- **P4** calls `ConfigSource.stopRollout` mid-flight, verifies that every user
-  receives the flag's `defaultValue` while stopped, then `resumeRollout`s and
-  confirms the original cohort is intact and a subsequent ramp to 75% only
-  grows the cohort (no flip-flopping out).
+- **P4** calls `ConfigSource.stopRollout` mid-flight and observes 8 live
+  readers flip to `defaultValue` within microseconds, then `resumeRollout`s
+  and watches them flip back; a subsequent ramp to 75% only grows the cohort
+  (no flip-flopping out). All writes go through a single writer thread so the
+  reader fleet can observe the SDK's atomic-snapshot propagation concurrently.
 
 Exits 0 on `PASS`, 1 on `FAIL`. `FlagDemoTest` runs the same script under
 `mvn test`, so the guarantees are checked in CI too.

@@ -30,8 +30,9 @@ New package `com.example.flags.demo` in `src/main`:
 | File | Responsibility |
 | --- | --- |
 | `FlagDemo.java` | Phase script, invariant checks, timeline output. `run()` returns `List<String>` of violations; `main()` prints and exits `1` if non-empty. |
-| `ReaderFleet.java` | 8 reader threads. Each records its last-observed value, the set of all values it ever observed, and an escaped-`Throwable` count (must remain 0). |
+| `ReaderFleet.java` | 8 reader threads, configurable to call `stringValue` or `boolValue`. Each records its last-observed value, the set of all values it ever observed, and an escaped-`Throwable` count (must remain 0). |
 | `CountingSink.java` | `ErrorSink` that counts per `ErrorKind` and keeps the first detail seen for each. |
+| `WriterFleet.java` | Single-thread writer that runs `Runnable` tasks submitted via `submit(...)` and signals completion with a per-task `CountDownLatch`. Used by P2 and P4 so the reader fleet can observe the SDK's atomic-snapshot propagation concurrently with the writes. |
 
 Run:
 
@@ -87,15 +88,24 @@ Output: observed propagation latency per step, in microseconds.
 Writer configures `checkout-v2` with a rule carrying a rollout on `user.id`, then
 ramps the percentage `0 → 25 → 50 → 100`.
 
-At each step the main thread sweeps 10,000 synthetic users (`u-0 … u-9999`)
-through the client and collects the enabled set.
+At each step the main thread submits the write to a single-thread `WriterFleet`
+and then sweeps 10,000 synthetic users (`u-0 … u-9999`) through the client to
+collect the enabled set. In parallel, 8 reader threads spin on
+`boolValue("checkout-v2", ctxFor("u-0"), false)` and visibly converge on each
+ramp step. The expected per-reader value is computed from `Bucketer.bucket(...)`
+at runtime, so the test is robust to hash-algorithm changes.
 
 Assertions:
 
 - The previous enabled set is a **strict subset** of the current one. Cohorts
   nest; no user ever falls out.
+- The 8 reader fleet converges on the expected value within 1 second per step
+  (a timeout is itself a violation, not a silent pass).
 
-Output: target percentage vs. observed percentage per step.
+Output: target percentage vs. observed percentage per step, plus the
+writer's per-step write latency and the readers' per-step converge latency,
+both in microseconds. The latter is the SDK's atomic-snapshot propagation
+time observed by 8 concurrent readers.
 
 ### P3 — Never-throws error contract
 
@@ -123,24 +133,33 @@ without any other flag mutation. Next, `resumeRollout` is called and the
 cohort is swept a third time. Finally, the writer publishes a higher
 percentage (75% ACTIVE) and sweeps once more.
 
-This is a sweep phase — no fleet — because the property to prove is the
-*set-level* behavior of stop/resume, not the per-read propagation. Propagation
-of `stopRollout`/`resumeRollout` is instant by the same atomic-snapshot
-mechanism that P1 demonstrates for `set`; re-proving it here would be noise.
+The P2 bool-mode reader fleet continues from P2. Writes go through the
+`WriterFleet`; the readers' converge latency per step is the live
+propagation latency for that write, observed by 8 concurrent readers
+in the demo itself (not just asserted sequentially).
+
+This is a sweep-plus-live phase: the sweep runs the cohort assertions
+(no user in `u-0..u-9999` ever falls out, the enabled set strictly
+grows across the ramp), and the live reader fleet runs the propagation
+assertions (8 readers converge on each step within 1 second).
 
 Assertions:
 
 - After `stopRollout`: **zero users enabled** — no user gets the rollout's
   `value`; every user gets the flag's `defaultValue` (false). Bucketing is
-  bypassed entirely.
+  bypassed entirely. The 8 live readers all flip to `"false"` within 1s.
 - After `resumeRollout`: the original 50% cohort is a **subset** of the
   resumed cohort (stickiness survives stop). The cohort is the exact same set
-  of users in practice (deterministic hash).
+  of users in practice (deterministic hash). The 8 live readers all flip to
+  the bucketer's expected value within 1s.
 - After ramping to 75% post-resume: the original 50% cohort is a **subset** of
   the 75% cohort (nested cohorts after resume; the high-water mark from the
   pre-stop 50% is retained, so 75% > 50% is accepted and the cohort only grows).
+  The 8 live readers all flip to the bucketer's expected value within 1s.
 
-Output: target state and percentage vs. observed enabled count per step.
+Output: per-step writer write latency + reader converge latency, both in
+microseconds. The `stopRollout` and `resumeRollout` lines are the live
+propagation latency for those new operations.
 
 ## Propagation timing
 
