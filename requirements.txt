@@ -1,0 +1,11 @@
+Build an in-process Feature Flag Service that an application can embed and query at runtime. The service decides, for a given flag and a given evaluation context (user, tenant, request attributes), what value to return.
+
+1.1. Core Functional Requirements
+Flag types: boolean, string, integer. Flags have a name, a default value, and a value type.
+Targeting rules: a flag's evaluation can return different values based on attributes of the evaluation context (e.g., country == "IN" → true, otherwise false).
+Percentage rollouts: a flag can be rolled out to N% of users. The same user must consistently get the same answer across calls (sticky bucketing). The same user must also get the same bucket across different flags' rollouts of the same percentage scheme only if the flag is configured to share the bucketing key - otherwise buckets must be independent. (Resolve ambiguity in your plan.)
+Environments: flags are defined per environment (e.g., dev, staging, prod). The same flag can have different configurations across environments.
+Live updates: flag configuration must be updatable at runtime without a service restart. Update propagation latency budget: under 5 seconds.
+Evaluation API: synchronous, low-latency. Must never throw to the caller; on internal error, return the flag's default value and emit a structured error log.
+Configuration source: assume an in-memory config store with a method set(flag_config) and get(flag_name, env). You decide how the SDK consumes it.
+Tests: unit tests covering flag types, targeting rules, percentage stickiness, environment isolation, default-on-error.
