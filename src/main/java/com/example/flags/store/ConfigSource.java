@@ -19,4 +19,7 @@ public interface ConfigSource {
 
     /** Current configuration for the scoped flag, or empty if not configured. */
     Optional<FlagConfig> get(String flagName, String environment, String tenant);
+
+    /** Removes the scoped flag configuration; no-op if absent. Readers see the removal immediately. */
+    void delete(String flagName, String environment, String tenant);
 }

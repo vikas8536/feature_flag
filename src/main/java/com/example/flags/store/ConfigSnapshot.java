@@ -20,6 +20,15 @@ public final class ConfigSnapshot {
         return new ConfigSnapshot(Map.copyOf(next));
     }
 
+    /** Returns a snapshot without the scoped flag; returns this snapshot unchanged if absent. */
+    public ConfigSnapshot without(String flagName, String environment, String tenant) {
+        ScopeKey key = new ScopeKey(environment, tenant, flagName);
+        if (!flags.containsKey(key)) return this;
+        Map<ScopeKey, FlagConfig> next = new HashMap<>(flags);
+        next.remove(key);
+        return new ConfigSnapshot(Map.copyOf(next));
+    }
+
     public Optional<FlagConfig> get(String flagName, String environment, String tenant) {
         return Optional.ofNullable(flags.get(new ScopeKey(environment, tenant, flagName)));
     }

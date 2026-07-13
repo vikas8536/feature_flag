@@ -48,6 +48,32 @@ class ConfigStoreTest {
         assertEquals(FlagValue.of(false), store.current().get("f", "prod", "acme").get().defaultValue());
     }
 
+    @Test void deleteRemovesOnlyTargetScope() {
+        var store = new ConfigStore();
+        store.set(flag("f", "prod", "acme", true));
+        store.set(flag("f", "dev", "acme", false));
+        store.delete("f", "prod", "acme");
+        assertTrue(store.get("f", "prod", "acme").isEmpty());
+        assertTrue(store.get("f", "dev", "acme").isPresent());   // other scope untouched
+        assertEquals(1, store.current().size());
+    }
+
+    @Test void deleteMissingIsNoOp() {
+        var store = new ConfigStore();
+        store.set(flag("f", "prod", "acme", true));
+        assertDoesNotThrow(() -> store.delete("ghost", "prod", "acme"));
+        assertEquals(1, store.current().size());
+    }
+
+    @Test void deleteDoesNotDisturbEarlierSnapshot() {
+        var store = new ConfigStore();
+        store.set(flag("f", "prod", "acme", true));
+        ConfigSnapshot snap = store.current();
+        store.delete("f", "prod", "acme");
+        assertTrue(snap.get("f", "prod", "acme").isPresent());   // old snapshot keeps it
+        assertTrue(store.current().get("f", "prod", "acme").isEmpty());
+    }
+
     @Test void sameFlagDifferentScopesCoexist() {
         var store = new ConfigStore();
         store.set(flag("f", "prod", "acme", true));

@@ -19,6 +19,11 @@ public final class ConfigStore implements ConfigSource {
         return snapshot.get().get(flagName, environment, tenant);
     }
 
+    @Override
+    public void delete(String flagName, String environment, String tenant) {
+        snapshot.updateAndGet(s -> s.without(flagName, environment, tenant));
+    }
+
     /** Internal/test view of the published snapshot; not part of the SDK's consumption surface. */
     ConfigSnapshot current() { return snapshot.get(); }
 }
