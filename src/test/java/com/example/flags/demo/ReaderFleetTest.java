@@ -85,4 +85,24 @@ class ReaderFleetTest {
             assertTrue(fleet.observedValues().contains(ReaderFleet.CALLER_DEFAULT));
         }
     }
+
+    @Test
+    void readersConvergeOnBoolValues() {
+        ConfigStore store = new ConfigStore();
+        store.set(greeting("v1"));
+
+        FeatureFlagClient client = FeatureFlagClient.builder()
+                .store(store).environment("prod").tenant("acme").errorSink(new CountingSink()).build();
+
+        // The flag is a STRING; boolValue returns the caller's default (false)
+        // because the SDK serves the caller's default on type mismatch. All
+        // bool-mode readers should observe "false".
+        try (ReaderFleet fleet = new ReaderFleet(client, "greeting", ctx(), 4, /*boolMode=*/true)) {
+            fleet.start();
+            assertTrue(fleet.awaitAll("false", ONE_SECOND_NANOS) >= 0,
+                    "bool-mode readers did not converge on the type-mismatch fallback");
+            assertEquals(0, fleet.escapedThrowables(),
+                    "a Throwable escaped into a bool-mode reader thread");
+        }
+    }
 }
